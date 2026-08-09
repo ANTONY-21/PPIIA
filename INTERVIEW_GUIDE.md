@@ -21,7 +21,7 @@ Follow the **Capstone Explanation Guideline** order: domain → problem → obje
 > "PPIIA is an AI platform that ingests a Bill PDF or URL, extracts and cleans the text, and produces a structured JSON report covering objective, summary, affected sectors, chronology, impacts, and risks — all in 8th-grade English."
 
 ### 1.3 Objective (2 lines)
-> "To build a reproducible, modular pipeline that converts any Indian government Bill into a citizen-friendly briefing, with two operating modes: a 100% free local mode using Hugging Face transformers, and an upgraded LLM mode using Llama-3.1-70B via Groq's free API."
+> "To build a reproducible, modular pipeline that converts any Indian government Bill into a citizen-friendly briefing, with two operating modes: a 100% free local mode using Hugging Face transformers, and an upgraded LLM mode using the Anthropic Claude API with structured outputs."
 
 ### 1.4 Problem statement (1 line)
 > "Citizens, journalists, and small businesses can't keep up with new legislation because the Bills are too long and too legalistic — PPIIA solves that with NLP + LLM summarization."
@@ -44,14 +44,15 @@ Follow the **Capstone Explanation Guideline** order: domain → problem → obje
 
 ### 1.8 The two operating modes (the key design decision)
 
-| | FREE mode | LLM mode |
+| | FREE (local) mode — `ppiia.py` | Claude AI mode — `ppiia_ai.py` |
 |---|---|---|
-| Trigger | No API key in `.env` | `GROQ_API_KEY` or `OPENAI_API_KEY` set |
-| Summarization | `sshleifer/distilbart-cnn-12-6` (HF pipeline) | Llama-3.1-70B via Groq, structured JSON |
-| Sector classification | `valhalla/distilbart-mnli-12-3` zero-shot | LLM JSON output |
-| Impact bullets | Heuristic — split summary into thirds | LLM with explicit short/medium/long-term reasoning |
-| Cost | Free, runs offline | Free (Groq) or paid (OpenAI) |
-| Quality | Decent extractive feel | Genuinely 8th-grade friendly |
+| Trigger | Engine picker in the sidebar; no key needed | `ANTHROPIC_API_KEY` in `.env` or pasted in the sidebar |
+| Summarization | `sshleifer/distilbart-cnn-12-6` (map-reduce) | Claude (Opus 5 default) with schema-validated structured outputs |
+| Sector classification | `valhalla/distilbart-mnli-12-3` zero-shot | Per-sector direction + magnitude + rationale + opportunities/restrictions |
+| Chronology / risks / FAQ | Regex act-mentions only | Policy background, timeline, risk flags, FAQ, persona impacts |
+| Impact bullets | Heuristic — split summary into thirds | Real short/medium/long-term reasoning with risks per window |
+| Cost | Free, runs offline | Pay-per-use API (Haiku 4.5 selectable for cheap runs) |
+| Quality | Decent extractive feel | Genuinely 8th-grade friendly (measured: FK grade ≈ 7 on the demo) |
 
 > "I built it dual-mode so the project works for **anyone** without an API key, but evaluators can plug in their own key and see professional-grade output. This is a real engineering choice, not laziness — it shows I can build production-ready pipelines that degrade gracefully."
 
@@ -66,10 +67,11 @@ Follow the **Capstone Explanation Guideline** order: domain → problem → obje
 - `multi_label=True` because a Bill can affect several sectors at once
 - Threshold = 0.2, top 5 returned
 
-### 1.11 LLM-mode summarization
-- One single Groq API call with a strict system prompt forcing 8th-grade English and `response_format={"type": "json_object"}` so the output is guaranteed valid JSON
-- The prompt explicitly lists every key the schema needs, including a closed-vocabulary `sectors` list to keep the model from inventing sectors
-- Falls back to regex JSON extraction if the model wraps the JSON in prose
+### 1.11 Claude-mode analysis (`ppiia_ai.py`)
+- **Four structured stages**, each one `client.messages.parse()` call validated against a pydantic schema: (1) classify + metadata, (2) chronology, (3) impact + risks, (4) citizen summary
+- Structured outputs constrain generation to the JSON schema — invalid JSON is impossible, so there's no regex JSON repair anywhere
+- The bill text is sent as an identical `cache_control` block in all four calls, so stages 2–4 read it from Anthropic's **prompt cache** instead of re-billing the full document
+- Closed vocabularies for category and sectors; every related act carries a `confidence` field (high = cited in the text, medium/low = model general knowledge) as the hallucination guardrail
 
 ### 1.12 Output schema (BillReport dataclass)
 ```python
@@ -83,6 +85,8 @@ Follow the **Capstone Explanation Guideline** order: domain → problem → obje
 ```
 A `dataclass` gives me type-checked attribute access in Python AND `to_dict()` for JSON serialisation in one place.
 
+The Claude engine uses a richer **pydantic** schema on top (`schemas.py: BillAnalysis`) — pydantic validates and coerces LLM output at runtime, which a dataclass cannot, and it doubles as the structured-output contract sent to the API. `BillAnalysis.from_local()` adapts the local `BillReport`, so one dashboard renders both engines.
+
 ### 1.13 Deployment
 - **Streamlit** (`app.py`) for local demos — tabs for Summary / Impacts / Chronology / Sectors / Risks / Raw JSON, with a download button
 - **Gradio** (in the Colab notebook) for public sharing — `demo.launch(share=True)` gives me a public URL I can drop into a LinkedIn demo video
@@ -90,7 +94,7 @@ A `dataclass` gives me type-checked attribute access in Python AND `to_dict()` f
 - All three reuse the same `analyze()` function from `ppiia.py` — single source of truth
 
 ### 1.14 Conclusion
-> "PPIIA is a complete, end-to-end NLP/LLM application: ingestion, cleaning, entity extraction, classification, summarization, structured output, dashboard, demo. It runs free on a laptop today and upgrades to a 70B parameter LLM the moment the user provides a Groq key. The code is modular, reproducible, and has zero secrets in the repo."
+> "PPIIA is a complete, end-to-end NLP/LLM application: ingestion, cleaning, entity extraction, classification, summarization, structured output, dashboard, demo. It runs free on a laptop today and upgrades to a frontier LLM — Claude — the moment the user provides an API key. The code is modular, reproducible, tested, and has zero secrets in the repo."
 
 ### 1.15 Business use
 - **Citizens** — instant briefing on new laws
@@ -107,11 +111,11 @@ Read every answer aloud once.
 ### Why both Free mode and LLM mode? Why not just one?
 > "Real engineering trade-off. Free mode means the project works on a laptop with zero setup — important for grading and reproducibility. LLM mode shows what's possible with a real instruction-following model. I detect the API key at runtime and switch transparently. It's the same pattern many open-source tools use, like LangChain or LlamaIndex."
 
-### Why Groq and not OpenAI?
-> "Groq has a **free tier** with Llama-3.1-70B at very fast inference speeds — ideal for a student project. OpenAI is paid. The code supports both, controlled by which env var is set."
+### Why Claude for the LLM mode?
+> "Three technical reasons. **Structured outputs**: `client.messages.parse()` takes my pydantic schema directly and the API constrains generation to it — the four stages literally cannot return malformed JSON. **Context**: Claude's 1M-token window fits any Indian bill whole, so there's no truncation or map-reduce in LLM mode. **Prompt caching**: I send the bill as an identical cached block in all four stage calls, so the document is billed roughly once, not four times. The UI also lets you drop to Haiku 4.5 when you want cheap fast runs."
 
-### What is `response_format={"type": "json_object"}`?
-> "It tells the API to constrain the model's output to be valid JSON. Without it, you have to parse free-form text and hope the model didn't wrap it in markdown. With it, you get guaranteed-valid JSON that I can `json.loads()` directly."
+### How do you guarantee valid JSON from the LLM?
+> "Structured outputs. Each stage calls `client.messages.parse(..., output_format=MyPydanticModel)` — the API constrains generation to the model's JSON schema, and the SDK validates and returns a typed object via `response.parsed_output`. That's stronger than prompting for JSON and calling `json.loads()`, because required fields and closed enums (like severity = low/medium/high) are enforced at generation time, not hoped for."
 
 ### Why `distilbart-cnn-12-6` for summarization?
 > "It's a **distilled** version of facebook/bart-large-cnn — about 3× smaller and 2× faster while keeping ~95% of the original ROUGE score. Small enough to run on CPU in a reasonable time. The full BART would be too slow for a free-tier demo."
@@ -120,7 +124,7 @@ Read every answer aloud once.
 > "BART has a 1024-token context window, but Bills can be 50,000+ words. **Map step**: split into chunks that fit, summarise each chunk independently. **Reduce step**: concatenate the chunk summaries and summarise THAT into a final summary. It's the same pattern as MapReduce in big-data frameworks, applied to document summarization."
 
 ### Why not just feed the whole document to the LLM?
-> "Two reasons: (1) cost / context — Llama-3.1-70B's free tier has token limits, and a 50k-word Bill blows past them. I truncate to the first 8000 words. (2) Even if you have unlimited context, the model's attention degrades on very long inputs. Map-reduce summarization (free mode) and front-loaded truncation (LLM mode) both work in practice."
+> "In **local mode** I can't — BART's context window is 1024 tokens, so map-reduce is mandatory. In **Claude mode** I do feed the whole document: the 1M-token context fits any real Indian bill, with a 400k-character cap purely as a cost guard. Instead of one giant do-everything prompt, I ask four focused questions over the same text — that keeps each answer sharp and lets each stage have its own strict output schema."
 
 ### What is zero-shot classification?
 > "A classifier that can label text against arbitrary categories it has never been trained on, by formulating each label as a hypothesis and using a **Natural Language Inference** model to score whether the input *entails* the hypothesis. So I just hand it 'Agriculture, Finance, Healthcare, ...' as candidate labels at inference time — no fine-tuning, no labelled data."
@@ -150,7 +154,7 @@ Read every answer aloud once.
 > "Create a Space with `streamlit` as the SDK, push `app.py` + `ppiia.py` + `requirements.txt`. Set `GROQ_API_KEY` as a Space secret in the settings. The Space will auto-build and serve the Streamlit app at a public URL. The brief lists this as a deliverable."
 
 ### What are the limitations?
-> "1) No OCR — scanned PDFs return empty text. 2) Truncates to 8000 words in LLM mode. 3) Free-mode impact analysis is heuristic, not real reasoning. 4) Sector list is hard-coded to 15 categories. 5) Chronology detection only catches acts already mentioned in the text — it doesn't actually look up a knowledge graph of Indian legislation."
+> "1) No OCR — scanned PDFs return empty text. 2) Claude mode caps input at 400k characters (bigger than any real bill, but a cap nonetheless). 3) Free-mode impact analysis is heuristic, not real reasoning. 4) Sector list is hard-coded to 15 categories. 5) Chronology beyond the bill text is model knowledge, not a verified legislative database — which is why every related act carries a confidence label."
 
 ### How would you improve it?
 > "1) **Add OCR** with Tesseract or paddleocr for scanned PDFs. 2) **RAG** — index a database of past Bills and retrieve related ones for the chronology section instead of relying on regex. 3) **Knowledge graph** of acts → amendments → committees, queried with NetworkX or Neo4j. 4) **Streaming output** in the Streamlit UI so the user sees the summary appearing token-by-token. 5) Add **human evaluation** of summaries with a thumbs-up/down feedback loop."
@@ -165,25 +169,41 @@ Read every answer aloud once.
 > "**BERT** is encoder-only — designed for classification, NER, masked-language tasks. **BART** is encoder-decoder — designed for sequence-to-sequence tasks like summarization and translation. That's why I use BART (encoder-decoder) for summarization and BART-MNLI (which uses BART's encoder for classification) for zero-shot."
 
 ### What is a context window?
-> "The maximum number of tokens a model can read in one forward pass. BART = 1024, GPT-4o-mini = 128,000, Llama-3.1-70B on Groq = 8,192. If your input is longer, you must chunk or truncate. That's what map-reduce summarization is for."
+> "The maximum number of tokens a model can read in one forward pass. BART = 1024; Claude Opus 5 and Sonnet 5 = 1,000,000; Claude Haiku 4.5 = 200,000. If your input is longer, you must chunk or truncate — that's what map-reduce summarization is for in local mode. In Claude mode the window is big enough that whole bills fit."
 
 ### What is Langflow (mentioned in the brief)?
 > "Langflow is a visual drag-and-drop UI for building LangChain pipelines. It generates the same kind of LLM chains I'm building in code, just visually. I chose to write Python directly because it's more reproducible, debuggable, and version-controllable than a JSON Langflow graph."
 
 ### How is this project different from projects 1 and 2?
-> "**Project 1 (Music Clustering)** is **unsupervised classical ML** — KMeans on numeric audio features. **Project 2 (Toxicity)** is **supervised deep learning** — a BiLSTM classifying short text. **Project 3 (PPIIA)** is **NLP + LLM applications** — pipelining transformers and a 70B-parameter language model into a structured analyzer. Together they cover ML, DL, and LLMs."
+> "**Project 1 (Music Clustering)** is **unsupervised classical ML** — KMeans on numeric audio features. **Project 2 (Toxicity)** is **supervised deep learning** — a BiLSTM classifying short text. **Project 3 (PPIIA)** is **NLP + LLM applications** — pipelining transformers and a frontier LLM (Claude) into a structured analyzer. Together they cover ML, DL, and LLMs."
 
 ### Walk me through what happens when I upload a PDF and click Analyze.
-> "1) Streamlit writes the upload to a temp file and passes the path to `analyze()`. 2) `extract_text_from_pdf()` runs pdfplumber. 3) `clean_text()` normalises whitespace. 4) `extract_entities()` runs the three regexes for years/acts/ministries. 5) `llm_available()` checks env vars. 6) If a key is set → `analyse_with_llm()` formats the prompt, calls Groq, parses JSON. Otherwise → `analyse_with_hf()` runs map-reduce summarization + zero-shot classification + heuristic impact splitting. 7) The result is wrapped in a `BillReport` dataclass and returned. 8) Streamlit renders each field in its own tab."
+> "1) Streamlit writes the upload to a temp file and `extract_text_from_pdf()` runs pdfplumber. 2) The app builds a `SourceInfo` (name, characters, words). 3) The engine picker decides the path. 4) **Claude mode** → `analyze_with_claude()` runs `prepare_text()` (keeps clause structure, strips page furniture) then the four structured stages, and assembles a `BillAnalysis` with readability and timing metrics. 5) **Local mode** → `ppiia.analyze()` runs cleaning, regex entities, map-reduce summarization and zero-shot classification, and the flat report is adapted via `BillAnalysis.from_local()`. 6) One renderer draws the tabs — summary, sector chart, timeline, forecast, risks — plus the JSON and PDF download buttons."
+
+### Why four LLM calls instead of one big prompt?
+> "Focused prompts beat kitchen-sink prompts. Each stage asks one question and gets one strict schema back — classification can't bleed into the summary, and a failure in one stage doesn't corrupt the others. The bill text is identical across calls, so prompt caching means I'm not paying four times for the document. It also mirrors how you'd draw it in Langflow: four prompt→model→parser branches merging into one record — that mapping is written up in `docs/langflow_design.md`."
+
+### How do you test an LLM app without spending money on every test run?
+> "Dependency injection. `analyze_with_claude()` accepts an `engine` object; tests pass a `FakeEngine` whose `run_stage()` returns canned pydantic objects, so the whole assembly path — schema validation, metrics, coercion — is tested with zero network calls. 21 tests run in under 5 seconds. The real `ClaudeEngine` is a thin wrapper, so the untested surface is minimal."
+
+### How do you measure summary quality?
+> "Readability is the project's own success criterion — '8th-grade friendly'. Every analysis computes the Flesch-Kincaid grade and Flesch reading ease of the citizen summary with `textstat` and shows them in the metrics row; the bundled demo scores grade 7.0, under the 8th-grade target. Alongside that: processing time and a compression ratio (input words ÷ summary words)."
+
+### What stops the model from inventing legislative history?
+> "Three guardrails. The system prompt forbids inventing act names. The chronology schema forces a `confidence` field per related act — `high` only when the act is cited in the bill text, `medium/low` when it comes from general knowledge — and the UI explains that split to the user. And the dashboard carries a standing disclaimer to verify against sansad.in / PRS India. You can't make an LLM incapable of error, so the honest design is to label uncertainty instead of hiding it."
+
+### What happens if the API call fails mid-analysis?
+> "Every failure mode maps to a clear user-facing message: bad key → 'API key rejected', 429 → 'rate-limited, wait a minute', network down → 'check your connection', model refusal or truncated output → actionable text. The Anthropic SDK retries transient errors up to 3 times with backoff before I ever surface anything."
 
 ---
 
 ## 3. Last-minute checklist
 
 - [ ] Run the Colab notebook end-to-end on a real Bill PDF (try one from sansad.in)
-- [ ] Get a free **Groq API key** so you can show LLM mode in the demo
-- [ ] Record a 30-second demo video using the Gradio public URL → upload to LinkedIn
+- [ ] Put your **ANTHROPIC_API_KEY** in `.env` so you can show Claude mode live — and remember the **⚡ Load sample demo** button works with no key at all
+- [ ] Run `pytest` once so you can say "21 tests, all passing" with a straight face
+- [ ] Record a 30-second demo video (Streamlit dashboard or the Gradio public URL) → upload to LinkedIn
 - [ ] Push the project to GitHub (without `.env`!) — the brief makes this **mandatory**
-- [ ] Have `ppiia.py`, `app.py` and this guide open in tabs during the live eval
+- [ ] Have `ppiia.py`, `ppiia_ai.py`, `app.py` and this guide open in tabs during the live eval
 - [ ] If asked "what would you do differently?" → OCR for scanned PDFs, RAG for chronology, streaming output
 - [ ] If asked "how is this different from your other projects?" → ML vs DL vs LLM (see Q above)

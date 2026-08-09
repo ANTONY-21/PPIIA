@@ -1,0 +1,7 @@
+# Optional: offline local-model engine (Hugging Face on CPU) + Colab/Gradio demo.
+# Only needed if you want to run PPIIA without any API key.
+-r requirements.txt
+torch>=2.2
+transformers>=4.40
+sentencepiece>=0.2
+gradio>=4.0

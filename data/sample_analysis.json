@@ -1,0 +1,300 @@
+{
+  "title": "The Andhra Pradesh Reorganisation (Amendment) Bill, 2026",
+  "ministry": "Ministry of Home Affairs and Cooperation",
+  "category": "Governance",
+  "secondary_categories": ["Infrastructure", "Justice and Law"],
+  "objective": "The bill amends the Andhra Pradesh Reorganisation Act, 2014 to formally name Amaravati as the capital of Andhra Pradesh. The 2014 Act only said the state 'shall have a new capital' once the ten-year period of sharing Hyderabad with Telangana ended, without naming it. Writing 'Amaravati' into the parent Act, with effect from 2 June 2024, gives the capital statutory certainty at the level of central law.",
+  "one_line_essence": "Parliament writes 'Amaravati' into the 2014 Reorganisation Act as Andhra Pradesh's capital, backdated to the day Hyderabad stopped being the shared capital.",
+  "plain_summary": "In 2014, Andhra Pradesh was split into two states: Telangana and a smaller Andhra Pradesh.\nThe 2014 law said both states would share Hyderabad as their capital for up to ten years.\nAfter that, Hyderabad would belong to Telangana, and Andhra Pradesh would need a new capital.\nThat shared period ended on 2 June 2024.\nAndhra Pradesh chose Amaravati as its capital, but the 2014 law never named it.\nThis bill fixes that gap. It writes the name 'Amaravati' into the law.\nIt counts as law from 2 June 2024, the day the sharing ended.\n'Amaravati' here means the capital city area already mapped under a 2014 state law.\nThe change gives legal certainty to the state government, builders, banks, and families.\nIt can help Amaravati get loans and big building projects moving faster.\nFarmers who gave land for the city get more confidence that the plans will go ahead.\nThe bill does not create any new tax or fee for ordinary people.\nIt also does not change anything for Hyderabad or for Telangana.\nSome people in other regions of Andhra Pradesh wanted the capital shared across three cities.\nThat political debate may continue, but this bill settles the legal question of the capital's name.",
+  "key_provisions": [
+    {
+      "title": "Short title and retrospective commencement",
+      "description": "Names the law the Andhra Pradesh Reorganisation (Amendment) Act, 2026 and deems it to have come into force on 2 June 2024 — the day the ten-year common-capital arrangement with Hyderabad expired.",
+      "clause_reference": "Clause 1"
+    },
+    {
+      "title": "Amaravati named as the new capital",
+      "description": "In section 5(2) of the 2014 Act, the words 'and there shall be a new capital' are replaced with 'and Amaravati shall be the new capital', making Amaravati the statutory capital of Andhra Pradesh.",
+      "clause_reference": "Clause 2(a)"
+    },
+    {
+      "title": "Definition of 'Amaravati'",
+      "description": "Adds Explanation 2 to section 5: 'Amaravati' includes the capital city areas notified under the Andhra Pradesh Capital Region Development Authority Act, 2014, tying the name to an already-defined geographic area.",
+      "clause_reference": "Clause 2(b)"
+    }
+  ],
+  "stakeholders": [
+    "Government of Andhra Pradesh",
+    "Residents of the Amaravati capital region",
+    "Farmers who pooled land for the capital",
+    "Real-estate developers and construction firms",
+    "Banks and infrastructure lenders",
+    "State government employees",
+    "Government of Telangana (unaffected, but a party to the 2014 Act)"
+  ],
+  "policy_background": "The Andhra Pradesh Reorganisation Act, 2014 bifurcated undivided Andhra Pradesh and created Telangana, with Hyderabad as a common capital for up to ten years. Andhra Pradesh selected Amaravati as its greenfield capital and notified it under the Andhra Pradesh Capital Region Development Authority Act, 2014, pooling roughly 33,000 acres from farmers. A 2020 state law proposing three capitals (executive, legislative, judicial) stalled in litigation and was repealed in 2021, leaving the capital question politically contested. The ten-year Hyderabad arrangement lapsed on 2 June 2024, and on 28 March 2026 the Andhra Pradesh Legislative Assembly passed a resolution asking the Union Government to write Amaravati into the central Act — which this bill does.",
+  "related_legislation": [
+    {
+      "name": "Andhra Pradesh Reorganisation Act, 2014",
+      "year": 2014,
+      "relationship": "amends",
+      "note": "The parent Act being amended; its section 5 governs the capital arrangements after bifurcation.",
+      "confidence": "high"
+    },
+    {
+      "name": "Andhra Pradesh Capital Region Development Authority Act, 2014",
+      "year": 2014,
+      "relationship": "related",
+      "note": "State law cited in the new Explanation 2 — defines the notified capital city area that 'Amaravati' refers to.",
+      "confidence": "high"
+    },
+    {
+      "name": "Hyderabad Municipal Corporation Act, 1955",
+      "year": 1955,
+      "relationship": "related",
+      "note": "Referenced in the annexed extract of the 2014 Act to define the Greater Hyderabad area that served as the common capital.",
+      "confidence": "high"
+    },
+    {
+      "name": "A.P. Decentralisation and Inclusive Development of All Regions Act, 2020",
+      "year": 2020,
+      "relationship": "related",
+      "note": "The 'three capitals' state law that was challenged in court and repealed in 2021; part of the political history behind fixing Amaravati's status.",
+      "confidence": "medium"
+    }
+  ],
+  "timeline": [
+    {
+      "year": "2014",
+      "label": "State bifurcation",
+      "description": "The Andhra Pradesh Reorganisation Act creates Telangana; Hyderabad becomes the common capital for up to ten years."
+    },
+    {
+      "year": "2014",
+      "label": "APCRDA Act",
+      "description": "Andhra Pradesh sets up the Capital Region Development Authority and notifies the Amaravati capital area."
+    },
+    {
+      "year": "2015",
+      "label": "Amaravati foundation",
+      "description": "Foundation stone laid for the greenfield capital; land pooling gathers about 33,000 acres from farmers."
+    },
+    {
+      "year": "2020",
+      "label": "Three-capitals plan",
+      "description": "A state law proposes separate executive, legislative and judicial capitals, triggering protests and litigation."
+    },
+    {
+      "year": "2021",
+      "label": "Plan repealed",
+      "description": "The three-capitals law is withdrawn, but uncertainty about the capital lingers."
+    },
+    {
+      "year": "2024",
+      "label": "Hyderabad era ends",
+      "description": "On 2 June the ten-year common-capital period expires; Hyderabad is Telangana's capital alone."
+    },
+    {
+      "year": "2026",
+      "label": "Assembly resolution & bill",
+      "description": "The AP Assembly (28 March) asks the Union to name Amaravati in the central Act; this bill is introduced in Lok Sabha (30 March)."
+    }
+  ],
+  "sector_impacts": [
+    {
+      "sector": "Infrastructure",
+      "direction": "positive",
+      "magnitude": "high",
+      "rationale": "Statutory certainty unlocks stalled capital-city construction — government complexes, housing, roads and utilities in the Amaravati region.",
+      "opportunities": [
+        "Revival of large construction contracts in the capital region",
+        "Easier access to multilateral and institutional funding for city-building"
+      ],
+      "restrictions": [
+        "Development must follow the APCRDA master-plan boundaries referenced by the bill"
+      ]
+    },
+    {
+      "sector": "Finance",
+      "direction": "positive",
+      "magnitude": "medium",
+      "rationale": "Lenders and bond markets get a clearer legal basis for financing Amaravati projects, lowering perceived political risk.",
+      "opportunities": [
+        "Infrastructure lending and municipal-bond issuance for the capital",
+        "Renewed institutional investment (e.g. development-bank credit lines)"
+      ],
+      "restrictions": [
+        "Large state borrowing for the capital could pressure Andhra Pradesh's fiscal position"
+      ]
+    },
+    {
+      "sector": "Trade and Commerce",
+      "direction": "positive",
+      "magnitude": "medium",
+      "rationale": "Businesses in the Vijayawada–Guntur belt gain location certainty for offices, retail and services around a permanent capital.",
+      "opportunities": [
+        "Commercial real estate and hospitality demand near government hubs",
+        "New services economy around the seat of administration"
+      ],
+      "restrictions": [
+        "Firms that bet on alternative capital cities may need to relocate plans"
+      ]
+    },
+    {
+      "sector": "Agriculture",
+      "direction": "mixed",
+      "magnitude": "medium",
+      "rationale": "Farmers who pooled land for Amaravati gain confidence their developed-plot entitlements will materialise, but capital construction continues converting fertile Krishna-delta farmland.",
+      "opportunities": [
+        "Land-pooling farmers' returnable plots gain value and certainty"
+      ],
+      "restrictions": [
+        "Continued conversion of agricultural land to urban use in the capital region"
+      ]
+    },
+    {
+      "sector": "Transport",
+      "direction": "positive",
+      "magnitude": "low",
+      "rationale": "A fixed capital anchors long-planned road, rail and transit connectivity investments for the region.",
+      "opportunities": [
+        "Progress on highway, rail and public-transport links to Amaravati"
+      ],
+      "restrictions": []
+    },
+    {
+      "sector": "Justice and Law",
+      "direction": "positive",
+      "magnitude": "low",
+      "rationale": "Naming the capital in the central Act reduces scope for further litigation over where Andhra Pradesh's capital legally is.",
+      "opportunities": [
+        "Fewer legal disputes over capital status and related notifications"
+      ],
+      "restrictions": []
+    }
+  ],
+  "term_impacts": {
+    "short_term": {
+      "effects": [
+        "Immediate statutory clarity that Amaravati is the capital, backdated to 2 June 2024",
+        "Government offices, notifications and records align to a single named capital",
+        "Signal to investors and lenders that the capital question is settled"
+      ],
+      "risks": [
+        "Renewed political friction from regions that favoured a decentralised, three-capital model"
+      ]
+    },
+    "medium_term": {
+      "effects": [
+        "Acceleration of Amaravati's core construction — secretariat, high-court complex, housing and trunk infrastructure",
+        "Growth of a services economy in the Vijayawada–Guntur–Amaravati belt",
+        "Delivery of developed plots to land-pooling farmers as the city takes shape"
+      ],
+      "risks": [
+        "Fiscal strain on the state budget if construction outpaces revenue and borrowing capacity",
+        "Delays or cost overruns typical of greenfield capital projects"
+      ]
+    },
+    "long_term": {
+      "effects": [
+        "Amaravati consolidates as the administrative and institutional centre of Andhra Pradesh",
+        "Regional development gravitates toward the capital region, reshaping the state's economic map"
+      ],
+      "risks": [
+        "Widening regional imbalance if Rayalaseema and north-coastal Andhra see less investment",
+        "Environmental pressure on the Krishna river floodplain as the city grows"
+      ]
+    }
+  },
+  "positives": [
+    "Ends a decade of legal uncertainty about Andhra Pradesh's capital",
+    "Honours the state Assembly's own resolution — Centre acting on the state's request",
+    "Boosts confidence for farmers who contributed land under the pooling scheme",
+    "Improves the state's ability to raise institutional finance for capital construction",
+    "A two-clause amendment with no new taxes, fees or compliance burden on citizens",
+    "Reduces scope for further capital-related litigation"
+  ],
+  "negatives": [
+    "Retrospective commencement (deemed from 2 June 2024) is unusual, even if benign here",
+    "Does not address demands for decentralised development voiced in the three-capitals debate",
+    "Locks public investment into one region, which may deepen regional disparities",
+    "Says nothing about compensation timelines for land-pooling farmers still awaiting plots",
+    "Continued urbanisation of fertile delta farmland remains a concern for food security"
+  ],
+  "risk_flags": [
+    {
+      "topic": "Regional imbalance and political friction",
+      "concern": "Rayalaseema and north-coastal Andhra groups campaigned for distributed capitals; centralising status in Amaravati may reignite protests and electoral contestation.",
+      "severity": "medium",
+      "affected_groups": ["Residents of Rayalaseema", "Residents of north-coastal Andhra", "State political parties"]
+    },
+    {
+      "topic": "Fiscal burden of capital construction",
+      "concern": "Building a greenfield capital costs tens of thousands of crores; statutory certainty accelerates spending commitments on an already stretched state budget.",
+      "severity": "medium",
+      "affected_groups": ["Andhra Pradesh taxpayers", "State government finances"]
+    },
+    {
+      "topic": "Land-pooling farmer expectations",
+      "concern": "The bill cements the capital but creates no new guarantee or timeline for the developed plots and annuities promised to about 29,000 farmer families.",
+      "severity": "medium",
+      "affected_groups": ["Land-pooling farmers in the capital region"]
+    },
+    {
+      "topic": "Retrospective operation",
+      "concern": "Deeming the law in force from 2 June 2024 is legally tidy but retrospectively validates intervening notifications, which could invite technical challenges.",
+      "severity": "low",
+      "affected_groups": ["Litigants in pending capital-related cases"]
+    }
+  ],
+  "controversy_level": "medium",
+  "citizen_faq": [
+    {
+      "question": "Does this bill build a new capital city?",
+      "answer": "No. It only writes the name 'Amaravati' into the 2014 law. Amaravati was already chosen and planned by the state; the bill gives that choice legal backing in central law."
+    },
+    {
+      "question": "Why is the bill backdated to 2 June 2024?",
+      "answer": "That is the day the ten-year period of sharing Hyderabad ended. Backdating means there is no legal gap between Hyderabad ceasing to be the shared capital and Amaravati becoming the named capital."
+    },
+    {
+      "question": "Does this cost me anything or add any new tax?",
+      "answer": "No. The bill itself creates no tax, fee or duty. Building the capital is funded separately through state budgets, loans and grants."
+    },
+    {
+      "question": "What happened to the three-capitals idea?",
+      "answer": "A 2020 state law proposed three capitals but was repealed in 2021 after protests and court cases. This bill settles the question in central law by naming Amaravati alone."
+    },
+    {
+      "question": "Does anything change for Hyderabad or Telangana?",
+      "answer": "No. Hyderabad has been Telangana's capital alone since 2 June 2024, and this bill does not touch that."
+    },
+    {
+      "question": "What does 'Amaravati' exactly cover?",
+      "answer": "The bill defines it as the capital city areas already notified under Andhra Pradesh's Capital Region Development Authority Act, 2014 — the master-planned area between Vijayawada and Guntur."
+    }
+  ],
+  "persona_impacts": [
+    {
+      "persona": "A farmer near Amaravati who pooled land",
+      "impact": "Your developed-plot entitlement now sits on firmer legal ground — the capital your land was taken for is finally named in central law, making reversals far less likely."
+    },
+    {
+      "persona": "A small business owner in Vijayawada or Guntur",
+      "impact": "A permanent capital next door means government offices, staff and visitors stay — steadier demand for shops, services, housing and hospitality."
+    },
+    {
+      "persona": "A state government employee",
+      "impact": "Postings and office locations stop shifting with the capital debate; expect consolidation of departments in Amaravati over the coming years."
+    }
+  ],
+  "source": {
+    "source_type": "sample",
+    "name": "sample_bill.pdf",
+    "char_count": 3991,
+    "word_count": 621,
+    "truncated": false
+  },
+  "metrics": null,
+  "generated_at": null
+}

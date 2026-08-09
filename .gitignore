@@ -8,6 +8,7 @@ __pycache__/
 venv/
 env/
 .ipynb_checkpoints/
+.pytest_cache/
 
 # OS
 .DS_Store
@@ -24,8 +25,9 @@ hf_cache/
 # Outputs / uploaded bills
 outputs/
 sample_bills/*.pdf
-sample_bill.pdf
 *.pdf
+# ...but keep the bundled sample so the demo works from a fresh clone
+!sample_bill.pdf
 
 # Stray folders
 PPLLA/

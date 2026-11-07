@@ -79,6 +79,8 @@ pytest
 
 The test suite covers source-evidence selection, schema adaptation, document preparation, sample data, PDF generation, and the Claude pipeline with a mocked API. The tests do not establish accuracy on every Bill or verify a live API call. A broader evaluation requires a diverse, expert-reviewed set of complete Bills.
 
+Readability scores are estimates. When the NLTK CMU pronunciation dictionary is already installed, the app uses textstat; otherwise it uses Pyphen's bundled hyphenation data as an offline approximation. It does not download the dictionary automatically during an analysis.
+
 ## Project files
 
 - `app.py` — Streamlit interface and input handling.

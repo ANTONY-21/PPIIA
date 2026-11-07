@@ -363,8 +363,16 @@ def compute_metrics(
     summary_words = len(summary_text.split()) if summary_text else 0
     if summary_words >= 10:
         try:
-            ease = round(float(textstat.flesch_reading_ease(summary_text)), 1)
-            grade = round(float(textstat.flesch_kincaid_grade(summary_text)), 1)
+            # textstat automatically downloads an NLTK corpus when it is
+            # missing. Check first so an offline demo never hangs on download.
+            import nltk
+            try:
+                nltk.data.find("corpora/cmudict")
+            except LookupError:
+                ease, grade = _fallback_readability(summary_text)
+            else:
+                ease = round(float(textstat.flesch_reading_ease(summary_text)), 1)
+                grade = round(float(textstat.flesch_kincaid_grade(summary_text)), 1)
         except Exception:
             pass
     ratio = None
@@ -380,6 +388,23 @@ def compute_metrics(
         summary_words=summary_words or None,
         compression_ratio=ratio,
     )
+
+
+def _fallback_readability(text: str) -> tuple[float, float]:
+    """Estimate Flesch scores offline using Pyphen's bundled hyphenation data."""
+    import pyphen
+
+    words = re.findall(r"[A-Za-z]+(?:['’-][A-Za-z]+)*", text)
+    if not words:
+        raise ValueError("No English words found for readability scoring")
+    sentences = max(1, sum(bool(part.strip()) for part in re.split(r"[.!?]+", text)))
+    hyphenator = pyphen.Pyphen(lang="en_US")
+    syllables = sum(len(hyphenator.positions(word.lower())) + 1 for word in words)
+    words_per_sentence = len(words) / sentences
+    syllables_per_word = syllables / len(words)
+    ease = 206.835 - 1.015 * words_per_sentence - 84.6 * syllables_per_word
+    grade = 0.39 * words_per_sentence + 11.8 * syllables_per_word - 15.59
+    return round(ease, 1), round(grade, 1)
 
 
 # ---------------------------------------------------------------------------

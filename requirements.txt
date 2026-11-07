@@ -12,3 +12,4 @@ plotly>=5.22
 pandas>=2.2
 fpdf2>=2.7.9
 textstat>=0.7.4
+pyphen>=0.14

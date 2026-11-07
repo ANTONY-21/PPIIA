@@ -63,10 +63,12 @@ def test_from_local_maps_flat_report():
     }
     analysis = BillAnalysis.from_local(report)
     assert analysis.title == "Local Bill"
-    assert analysis.category == "Finance"
-    assert [s.sector for s in analysis.sector_impacts] == ["Finance", "Technology"]
+    assert analysis.category == "Not assessed"
+    assert analysis.detected_sectors == ["Finance", "Technology"]
+    assert analysis.sector_impacts == []
+    assert analysis.controversy_level is None
     assert analysis.related_legislation[0].name == "Old Act, 2000"
-    assert analysis.related_legislation[0].confidence == "high"
+    assert analysis.related_legislation[0].confidence == "medium"
     assert analysis.term_impacts.short_term.effects == ["Soon."]
     assert analysis.term_impacts.medium_term.effects == []
     assert analysis.risk_flags[0].concern == "a risk"

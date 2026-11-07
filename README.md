@@ -1,147 +1,104 @@
-# 🏛️ Public Policy Insight & Impact Analyzer (PPIIA)
+# Public Policy Insight & Impact Analyzer (PPIIA)
 
-**Simplifying government Bills for every citizen.**
+PPIIA helps users explore English government Bills from a selectable-text PDF, a direct document URL, or pasted text. It provides a source-based local analysis, an optional local AI draft, and a separate Claude-powered analysis. The dashboard can export JSON and PDF reports.
 
-Give PPIIA any Indian government Bill — a PDF, a [sansad.in](https://sansad.in/ls/knowledge-centre/government-bills) URL, or pasted text — and it produces a structured, plain-English briefing:
+**This is an education and research aid, not legal advice.** Automatically selected passages and topic suggestions can be incomplete, incidental, or affected by PDF extraction errors. Check the complete Bill and consult a qualified expert before relying on an interpretation.
 
-- 📖 **Citizen-friendly summary** — 10–20 lines at an 8th-grade reading level, plus an FAQ and "what changes for you" persona cards
-- 🎯 **Objective, ministry & key provisions** with clause references
-- 🏭 **Sector & industry impact** — direction, magnitude, opportunities and restrictions per sector, with a chart
-- 🕰️ **Chronology** — predecessor acts, amendments, and a policy-evolution timeline
-- 🔮 **Impact forecast** — short-term (0–1 y), medium-term (1–5 y), long-term (5+ y), each with risks
-- ⚠️ **Risk & controversy detection** — clauses likely to raise costs, affect rights, or cause friction
-- ⬇️ **Exports** — the full JSON report and a downloadable PDF briefing
+## Local source-based analysis
 
-## Two analysis engines, one dashboard
+Local analysis is the default and does not require an API key or model download. It:
 
-| | 🤖 Claude AI engine (`ppiia_ai.py`) | 💻 Local engine (`ppiia.py`) |
-|---|---|---|
-| Needs | `ANTHROPIC_API_KEY` | Nothing (offline after ~700 MB model download) |
-| Models | Claude Opus 5 (default), Sonnet 5, or Haiku 4.5 | `distilbart-cnn` + `distilbart-mnli` on CPU |
-| Output | Full structured analysis (all features above), schema-validated JSON | Summary, sectors, entities, heuristic impacts |
-| Quality | Genuinely 8th-grade friendly, deep analysis | Decent extractive feel |
+- Extracts text from a PDF, direct URL, or pasted text.
+- Selects the Bill's stated purpose and potentially substantive passages using text patterns. The summary retains source wording and may remain technical.
+- Suggests possible sectors from specific keyword matches, displaying the matched phrase and an excerpt. A match does **not** establish an actual impact, and the app may omit relevant sectors or abstain when it finds no clear match.
+- Shows possible references to legislation and allows JSON and PDF export.
 
-The dual-mode design means the project runs for **anyone** — no key required — while an API key unlocks the complete analysis. A **precomputed demo** of the bundled sample bill loads with one click, needing neither.
+The local default does not assess controversy, determine legal status, or forecast future effects. Image-only PDFs require OCR before upload. English text-based documents work best; selection and extraction can still miss or distort details.
 
-## Quick start
+### Optional AI draft
+
+Select **Generate an additional AI draft** in the sidebar to run DistilBART locally. This is slower and may generate inaccurate or incomplete text. The draft is displayed separately from the source-based summary and requires the optional dependencies and model downloads.
+
+### Claude analysis
+
+The Claude option uses an Anthropic API key and a four-stage structured pipeline for metadata, chronology, impact and risk, and a citizen summary. Its outputs are model-generated and require independent verification. Structured schema validation checks format, not truth. The model selections and API access must be available to the account used.
+
+A precomputed sample analysis is also available via **Load sample demo**. It demonstrates the interface without running a new analysis.
+
+## Setup
 
 ```bash
 git clone https://github.com/ANTONY-21/PPIIA.git
 cd PPIIA
 python -m venv .venv
-.venv\Scripts\activate          # Windows   (macOS/Linux: source .venv/bin/activate)
-pip install -r requirements.txt
 ```
 
-**Claude engine (recommended):** copy `.env.example` to `.env` and set your `ANTHROPIC_API_KEY` (or paste the key in the app sidebar).
-
-**Local engine (optional, offline):** `pip install -r requirements-local.txt`
-
-Then launch the dashboard:
+Activate the environment on Windows with `.venv\Scripts\activate` or on macOS/Linux with `source .venv/bin/activate`, then run:
 
 ```bash
+pip install -r requirements.txt
 streamlit run app.py
 ```
 
-No key handy? Click **⚡ Load sample demo** in the sidebar to explore a precomputed analysis of the bundled sample bill (*The Andhra Pradesh Reorganisation (Amendment) Bill, 2026*).
-
-### CLI
+For the optional local AI draft, also install:
 
 ```bash
-# Claude engine — JSON + PDF report
-python ppiia_ai.py sample --out outputs/analysis.json --pdf outputs/report.pdf
-python ppiia_ai.py path/to/bill.pdf
-python ppiia_ai.py https://sansad.in/.../bill.pdf
-
-# Local engine
-python ppiia.py path/to/bill.pdf --out outputs/report.json
+pip install -r requirements-local.txt
 ```
 
-### Tests
+The first AI run downloads model weights unless they are already cached. Set `HF_HOME` to change the Hugging Face cache location. Advanced users can set `PPIIA_MODELS_DIR` to a directory containing `summarizer` and `classifier` checkpoint folders.
+
+For Claude, configure `ANTHROPIC_API_KEY` in the environment or a local `.env` based on `.env.example`, or enter it in the app. Keep keys private and never commit them. Test model availability and usage costs before a live demonstration.
+
+## Using the dashboard
+
+1. Select **Local analysis** or the Claude engine.
+2. Upload a text-based PDF, provide a direct document URL, or paste text.
+3. Select **Analyze bill**. For the saved example, select **Load sample demo** instead.
+4. Review the source summary and the topic evidence. Compare excerpts with the full Bill.
+5. Use **Export & data** to download the report.
+
+A Parliament listing page is not itself a Bill. Open an individual Bill and use its direct PDF link, or download and upload the PDF. Some dynamic pages cannot be extracted.
+
+## Command line
+
+```bash
+# Local source-based analysis to JSON
+python ppiia.py path/to/bill.pdf --out outputs/report.json
+
+# Claude analysis (requires an API key and an available model)
+python ppiia_ai.py sample --out outputs/analysis.json --pdf outputs/report.pdf
+```
+
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-21 tests cover schema validation/coercion, text preparation, the four-stage pipeline (API mocked), the bundled demo data, and PDF generation. No test calls the network.
+The test suite covers source-evidence selection, schema adaptation, document preparation, sample data, PDF generation, and the Claude pipeline with a mocked API. The tests do not establish accuracy on every Bill or verify a live API call. A broader evaluation requires a diverse, expert-reviewed set of complete Bills.
 
-## How the Claude pipeline works
+## Project files
 
-```
-PDF / URL / text
-      │  ingestion (pdfplumber · requests + BeautifulSoup)   ← shared with local engine
-      ▼
-prepare_text()          keeps line/clause structure, strips page numbers,
-      │                 joins hyphenated line-wraps, caps input size
-      ▼
-┌─ Stage 1  Bill topic classifier ─ title, ministry, category, objective,
-│                                   key provisions, stakeholders
-├─ Stage 2  Chronology builder ──── policy background, related acts
-│                                   (with confidence levels), timeline
-├─ Stage 3  Impact analyzer ─────── per-sector impacts, short/medium/long-term
-│                                   forecast, positives/negatives, risk flags
-└─ Stage 4  Citizen summarizer ──── 8th-grade summary, FAQ, persona impacts
-      │
-      ▼
-BillAnalysis (pydantic)  →  dashboard · JSON export · PDF report
-```
-
-Implementation notes:
-
-- **Structured outputs** — every stage uses `client.messages.parse()` with a strict pydantic schema, so the model's JSON is validated at the API layer; no regex JSON-repair needed.
-- **Prompt caching** — the bill text is sent as an identical cached block in all four calls, so stages 2–4 read it from Anthropic's prompt cache instead of re-billing full input.
-- **Hallucination guardrails** — every related act carries a `confidence` field: `high` = cited in the bill text, `medium/low` = from the model's general knowledge; the UI says so.
-- **Graceful failure** — refusals, rate limits, auth errors and truncated outputs surface as clear, actionable messages in the UI.
-
-The dashboard renders both engines through one schema: `BillAnalysis.from_local()` adapts the local engine's flat report, so tabs, charts and exports work in either mode.
-
-## Project structure
-
-```
-PPIIA/
-├── app.py                   # Streamlit dashboard (both engines + demo mode)
-├── ppiia.py                 # local engine: ingestion, cleaning, HF models, CLI
-├── ppiia_ai.py              # Claude engine: 4-stage pipeline, metrics, CLI
-├── schemas.py               # pydantic models: BillAnalysis + LLM stage schemas
-├── report_pdf.py            # PDF briefing generator (fpdf2)
-├── data/sample_analysis.json# precomputed demo of the sample bill
-├── sample_bill.pdf          # AP Reorganisation (Amendment) Bill, 2026
-├── tests/                   # 21 offline tests
-├── docs/langflow_design.md  # the pipeline as a Langflow graph
-├── ppiia_colab.ipynb        # Colab notebook + Gradio demo (local engine)
-├── requirements.txt         # core (Claude engine + dashboard)
-├── requirements-local.txt   # + torch/transformers for offline mode
-├── requirements-dev.txt     # + pytest
-└── INTERVIEW_GUIDE.md       # live-evaluation study guide
-```
-
-## Evaluation metrics
-
-Shown in the app under **🗂️ Export & data** for every analysis:
-
-| Project metric | How PPIIA measures it |
-|---|---|
-| Quality of summarization / readability | Flesch reading ease + Flesch-Kincaid grade of the summary (target ≤ 8) |
-| Topic classification accuracy | Closed category vocabulary + reviewable category/sector labels per bill |
-| Chronology correctness | Per-act `confidence` labels separate text-cited facts from model knowledge |
-| Relevance of industry impact | Per-sector rationale, opportunities and restrictions are all inspectable |
-| Processing time | Wall-clock seconds per document, shown in the metrics row |
+- `app.py` — Streamlit interface and input handling.
+- `ppiia.py` — local ingestion, source-based analysis, and optional model draft.
+- `evidence.py` — source passage and topic-evidence selection.
+- `ppiia_ai.py` — Claude pipeline and readability metrics.
+- `schemas.py` — shared Pydantic output models.
+- `report_pdf.py` — PDF report generation.
+- `data/sample_analysis.json` and `sample_bill.pdf` — precomputed demonstration.
+- `tests/` — automated checks; `INTERVIEW_GUIDE.md` — evaluation notes.
 
 ## Deployment
 
-- **Streamlit Community Cloud** — push to GitHub, create an app pointing at `app.py`, and add `ANTHROPIC_API_KEY` in the app's *Secrets*.
-- **Hugging Face Spaces** — create a Streamlit Space, upload the repo (keep `requirements.txt` as-is; skip `requirements-local.txt` to stay in the free tier), and set `ANTHROPIC_API_KEY` as a Space secret.
-- **Colab / Gradio** — `ppiia_colab.ipynb` runs the local engine with a public Gradio URL.
+Streamlit Community Cloud can deploy this repository using `app.py` as its entry point. The source-based mode works without an API key. A public deployment should be tested independently, including access and resource limits, before it is shared. See the [Streamlit deployment guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy).
 
-## Limitations & disclaimer
+## Limitations
 
-- Scanned (image-only) PDFs need OCR first — PPIIA reads embedded text.
-- JavaScript-heavy portal pages may not fetch; direct PDF links work best.
-- Historical context beyond the bill text is model knowledge — check the confidence labels and verify before quoting.
+- The source-based summary is a selection of source text, not a complete or guaranteed-correct interpretation.
+- Topic matches are evidence of words in a document, not proof of an affected sector.
+- Scanned PDFs require OCR; extraction from complex layouts and dynamic sites can fail.
+- AI drafts and generated chronology, impacts, or risk analysis may be wrong and should be checked against official sources.
 
-PPIIA is an AI-powered **civic education tool, not legal advice**. Always verify against official sources: [sansad.in](https://sansad.in) · [prsindia.org](https://prsindia.org) · [egazette.gov.in](https://egazette.gov.in).
-
-## Tech tags
-
-`Python` `NLP` `Legal NLP` `Claude API` `Structured Outputs` `Prompt Caching` `Transformers` `Zero-Shot Classification` `Summarization` `Streamlit` `Plotly` `Pydantic` `Regulation Analytics`
+Consult [Sansad](https://sansad.in), [PRS Legislative Research](https://prsindia.org), or the [e-Gazette](https://egazette.gov.in) for original documents and current legal status.

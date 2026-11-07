@@ -40,6 +40,7 @@ import re
 import json
 import argparse
 from dataclasses import dataclass, asdict, field
+import evidence
 
 
 # ---------------------------------------------------------------------------
@@ -54,8 +55,8 @@ SECTORS = [
 
 # Chunk long documents to fit inside model context windows
 CHUNK_TOKENS = 900          # ~words, rough proxy
-SUMMARY_MAX_LEN = 220       # target tokens per chunk summary (HF pipeline)
-SUMMARY_MIN_LEN = 80
+SUMMARY_MAX_LEN = 120       # generated tokens per chunk
+SUMMARY_MIN_LEN = 15
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +68,9 @@ class BillReport:
     ministry: str = ""
     objective: str = ""
     summary: str = ""
+    source_passages: list = field(default_factory=list)
+    topic_evidence: list = field(default_factory=list)
+    ai_draft: str = ""
     sectors: list = field(default_factory=list)
     key_entities: dict = field(default_factory=dict)
     chronology: list = field(default_factory=list)
@@ -83,17 +87,18 @@ class BillReport:
 # 1. Input ingestion
 # ---------------------------------------------------------------------------
 def extract_text_from_pdf(path: str) -> str:
-    """Extract plain text from a PDF using pdfplumber (preferred) or pypdf."""
+    """Extract text in reading order, falling back to pdfplumber if needed."""
     print(f"[1] Extracting text from PDF: {path}")
     try:
-        import pdfplumber
-        with pdfplumber.open(path) as pdf:
-            pages = [p.extract_text() or "" for p in pdf.pages]
-        text = "\n".join(pages)
-    except ImportError:
         from pypdf import PdfReader
         reader = PdfReader(path)
         text = "\n".join((p.extract_text() or "") for p in reader.pages)
+    except Exception:
+        text = ""
+    if len(text.strip()) < 200:
+        import pdfplumber
+        with pdfplumber.open(path) as pdf:
+            text = "\n".join(p.extract_text() or "" for p in pdf.pages)
 
     print(f"    -> {len(text):,} characters extracted")
     return text
@@ -115,7 +120,10 @@ def extract_text_from_url(url: str) -> str:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             f.write(resp.content)
             tmp = f.name
-        return extract_text_from_pdf(tmp)
+        try:
+            return extract_text_from_pdf(tmp)
+        finally:
+            os.unlink(tmp)
 
     # Assume HTML
     from bs4 import BeautifulSoup
@@ -123,6 +131,8 @@ def extract_text_from_url(url: str) -> str:
     for tag in soup(["script", "style", "nav", "footer", "header"]):
         tag.decompose()
     text = soup.get_text(separator="\n")
+    if "/knowledge-centre/government-bills" in url.lower():
+        raise ValueError("This URL is a list of bills, not a bill document. Open a specific bill and copy its PDF link, or upload its PDF.")
     print(f"    -> {len(text):,} characters extracted")
     return text
 
@@ -182,6 +192,11 @@ def extract_entities(text: str) -> dict:
     }
 
 
+def extract_key_passages(text: str, limit: int = 4) -> list[str]:
+    """Select source passages for review; extraction is not exhaustive."""
+    return evidence.selected_passages(text, limit)
+
+
 # ---------------------------------------------------------------------------
 # 4. Title / ministry heuristics
 # ---------------------------------------------------------------------------
@@ -190,12 +205,20 @@ def guess_title(text: str) -> str:
     First reasonable-looking sentence that mentions 'Bill' or 'Act'.
     Falls back to the first non-empty line.
     """
+    # Parliamentary PDFs often break the heading across several lines.
+    match = re.search(
+        r"\bTHE\s+([A-Z][A-Z0-9\s(),&'’\-]{5,180}?\bBILL\s*,?\s*20\d{2})\b",
+        text[:12000], re.IGNORECASE,
+    )
+    if match:
+        return "The " + " ".join(match.group(1).split()).title()
     lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
     for ln in lines[:40]:
         if "bill" in ln.lower() or "act" in ln.lower():
             if 5 < len(ln.split()) < 25:
                 return ln
-    return lines[0] if lines else ""
+    first = lines[0] if lines else ""
+    return first if 5 <= len(first) <= 160 else "Untitled Bill"
 
 
 def guess_ministry(text: str) -> str:
@@ -225,25 +248,34 @@ def _load_hf_models():
     """Lazy-load HF models directly (first call downloads the weights)."""
     global _sum_tok, _sum_model, _mnli_tok, _mnli_model
     import torch  # noqa: F401
+    torch.set_num_threads(min(8, os.cpu_count() or 4))
     from transformers import (
         AutoTokenizer,
         AutoModelForSeq2SeqLM,
         AutoModelForSequenceClassification,
     )
 
+    model_root = os.getenv("PPIIA_MODELS_DIR")
+    local_summary = os.path.join(model_root, "summarizer") if model_root else None
+    local_classifier = os.path.join(model_root, "classifier") if model_root else None
+    if model_root and not all(os.path.isfile(os.path.join(p, "pytorch_model.bin")) for p in (local_summary, local_classifier)):
+        raise RuntimeError("The model directory is incomplete. PPIIA_MODELS_DIR must contain summarizer and classifier checkpoints, or be unset to use the Hugging Face cache.")
+    summary_source = local_summary if local_summary and os.path.isfile(os.path.join(local_summary, "pytorch_model.bin")) else "sshleifer/distilbart-cnn-12-6"
+    classifier_source = local_classifier if local_classifier and os.path.isfile(os.path.join(local_classifier, "pytorch_model.bin")) else "valhalla/distilbart-mnli-12-3"
+
     if _sum_model is None:
         print("[HF] loading summarizer (sshleifer/distilbart-cnn-12-6) ...")
-        _sum_tok = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
+        _sum_tok = AutoTokenizer.from_pretrained(summary_source)
         _sum_model = AutoModelForSeq2SeqLM.from_pretrained(
-            "sshleifer/distilbart-cnn-12-6"
+            summary_source
         )
         _sum_model.eval()
 
     if _mnli_model is None:
         print("[HF] loading zero-shot NLI model (valhalla/distilbart-mnli-12-3) ...")
-        _mnli_tok = AutoTokenizer.from_pretrained("valhalla/distilbart-mnli-12-3")
+        _mnli_tok = AutoTokenizer.from_pretrained(classifier_source)
         _mnli_model = AutoModelForSequenceClassification.from_pretrained(
-            "valhalla/distilbart-mnli-12-3"
+            classifier_source
         )
         _mnli_model.eval()
 
@@ -257,17 +289,27 @@ def _summarize_chunk(text: str, max_len: int, min_len: int) -> str:
     inputs = tok(
         text, return_tensors="pt", truncation=True, max_length=1024
     )
+    input_length = inputs["input_ids"].shape[-1]
+    max_len = max(20, min(max_len, max(20, input_length // 2)))
+    min_len = min(min_len, max_len - 1)
     with torch.no_grad():
         out_ids = model.generate(
             **inputs,
             max_length=max_len,
             min_length=min_len,
-            num_beams=4,
+            num_beams=2,
             length_penalty=2.0,
             early_stopping=True,
             no_repeat_ngram_size=3,
         )
-    return tok.decode(out_ids[0], skip_special_tokens=True)
+    result = tok.decode(out_ids[0], skip_special_tokens=True).strip()
+    # Generation can reach its token limit mid-sentence. Keep completed
+    # sentences where possible rather than presenting a dangling fragment.
+    if result and result[-1] not in ".!?":
+        endings = [m.end() for m in re.finditer(r"[.!?](?=\s|$)", result)]
+        if endings:
+            result = result[:endings[-1]].strip()
+    return result
 
 
 def summarize_long_text(text: str) -> str:
@@ -277,13 +319,17 @@ def summarize_long_text(text: str) -> str:
       2. Summarise each chunk.
       3. Join summaries and summarise again (reduce step).
     """
-    _load_hf_models()
-    chunks = chunk_text(text, max_words=CHUNK_TOKENS)
+    tokenizer, _, _, _ = _load_hf_models()
+    # Split by model tokens, not words, so legal terms and numbers are not
+    # silently dropped when the tokenizer expands them into multiple tokens.
+    ids = tokenizer.encode(text, add_special_tokens=False, truncation=False)
+    token_chunks = [ids[i:i + 850] for i in range(0, len(ids), 850)]
+    chunks = [tokenizer.decode(chunk, skip_special_tokens=True) for chunk in token_chunks]
     print(f"[HF] map-reduce summarization over {len(chunks)} chunks ...")
 
     partials = []
     for i, ch in enumerate(chunks):
-        if len(ch.split()) < 30:
+        if not ch.strip():
             continue
         s = _summarize_chunk(ch, SUMMARY_MAX_LEN, SUMMARY_MIN_LEN)
         partials.append(s)
@@ -293,8 +339,16 @@ def summarize_long_text(text: str) -> str:
     if len(joined.split()) < 200:
         return joined
 
-    # Reduce step
-    return _summarize_chunk(joined, 300, 120)
+    # Recursively reduce instead of truncating a long combined summary.
+    for _ in range(10):
+        joined_ids = tokenizer.encode(joined, add_special_tokens=False, truncation=False)
+        if len(joined_ids) <= 850:
+            return _summarize_chunk(joined, 300, 60)
+        groups = [joined_ids[i:i + 850] for i in range(0, len(joined_ids), 850)]
+        reduced = [_summarize_chunk(tokenizer.decode(g, skip_special_tokens=True), 220, 40)
+                   for g in groups]
+        joined = " ".join(reduced)
+    raise ValueError("The document is too large to summarize reliably in local mode.")
 
 
 def classify_sectors_hf(text: str, top_k: int = 5) -> list:
@@ -346,15 +400,14 @@ def analyse_with_hf(text: str) -> dict:
     """Local-mode analyser using only open HuggingFace models."""
     summary = summarize_long_text(text)
     sectors = classify_sectors_hf(text)
-    impacts = _simple_impact_bullets(summary)
     return {
         "title": "",
         "ministry": "",
-        "objective": summary.split(".")[0] + "." if summary else "",
+        "objective": "",
         "summary": summary,
         "sectors": sectors,
         "chronology": [],
-        "impacts": impacts,
+        "impacts": {},
         "positives": [],
         "negatives": [],
         "risks": [],
@@ -364,7 +417,7 @@ def analyse_with_hf(text: str) -> dict:
 # ---------------------------------------------------------------------------
 # 6. Top-level pipeline
 # ---------------------------------------------------------------------------
-def analyze(source: str) -> BillReport:
+def analyze(source: str, use_ai_draft: bool = False) -> BillReport:
     """
     Main entrypoint. `source` can be:
         - a path to a PDF
@@ -381,31 +434,34 @@ def analyze(source: str) -> BillReport:
 
     text = clean_text(raw)
     if len(text) < 200:
-        raise ValueError("Extracted text is too short to analyze.")
+        raise ValueError("The document has too little readable text. If the PDF is scanned, run OCR first or paste the English text.")
 
     print(f"[2] Cleaned text length = {len(text):,} chars, "
           f"{len(text.split()):,} words")
 
     # Regex-based quick wins
     entities = extract_entities(text)
-    title_guess = guess_title(text)
-    ministry_guess = guess_ministry(text)
+    title_guess = guess_title(raw)
+    ministry_guess = guess_ministry(raw)
 
-    print("[3] Running LOCAL AI analysis (Hugging Face, CPU)")
-    data = analyse_with_hf(text)
+    print("[3] Selecting source-grounded passages and topic evidence")
+    passages = extract_key_passages(raw)
+    purpose = evidence.stated_purpose(raw)
+    topic_matches = evidence.identify_topics(raw, title_guess, purpose)
+    ai_draft = summarize_long_text(text) if use_ai_draft else ""
 
     report = BillReport(
-        title=data.get("title") or title_guess,
-        ministry=data.get("ministry") or ministry_guess,
-        objective=data.get("objective", ""),
-        summary=data.get("summary", ""),
-        sectors=data.get("sectors", []),
+        title=title_guess,
+        ministry=ministry_guess,
+        objective="",
+        summary=evidence.build_source_summary(raw, passages),
+        source_passages=passages,
+        topic_evidence=[asdict(item) for item in topic_matches],
+        ai_draft=ai_draft,
+        sectors=[item.sector for item in topic_matches],
         key_entities=entities,
-        chronology=data.get("chronology") or entities.get("acts_cited", []),
-        impacts=data.get("impacts", {}),
-        positives=data.get("positives", []),
-        negatives=data.get("negatives", []),
-        risks=data.get("risks", []),
+        chronology=entities.get("acts_cited", []),
+        impacts={}, positives=[], negatives=[], risks=[],
     )
     return report
 

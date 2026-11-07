@@ -23,6 +23,7 @@ import importlib.util
 import re
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -66,7 +67,10 @@ def extract_input_text(mode: str, uploaded, url_value: str, pasted: str) -> tupl
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             tmp.write(uploaded.getvalue())
             tmp_path = tmp.name
-        raw = ppiia.extract_text_from_pdf(tmp_path)
+        try:
+            raw = ppiia.extract_text_from_pdf(tmp_path)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
         return raw, ppiia_ai.build_source_info(raw, "pdf", uploaded.name)
 
     if mode == "🔗 Fetch from URL":
@@ -93,7 +97,7 @@ def local_models_available() -> bool:
 
 
 def run_analysis(engine_name: str, mode: str, uploaded, url_value: str, pasted: str,
-                 api_key: str | None, model_id: str) -> None:
+                 api_key: str | None, model_id: str, use_ai_draft: bool = False) -> None:
     try:
         with st.status("Reading the document…", expanded=True) as status:
             raw, source = extract_input_text(mode, uploaded, url_value, pasted)
@@ -105,19 +109,20 @@ def run_analysis(engine_name: str, mode: str, uploaded, url_value: str, pasted: 
                     raw, source, api_key=api_key, model=model_id, progress=st.write
                 )
             else:
-                if not local_models_available():
+                if use_ai_draft and not local_models_available():
                     raise AnalysisError(
                         "Local models are not installed. Run "
                         "`pip install -r requirements-local.txt` (about 700 MB of "
                         "model downloads on first use), or switch to the Claude engine."
                     )
-                status.update(label="Analyzing with local Hugging Face models (CPU — this can take a few minutes)…")
-                report = ppiia.analyze(raw)
+                status.update(label="Selecting source passages and sector evidence…" if not use_ai_draft else "Selecting evidence and generating an AI draft (this can take a few minutes)…")
+                started = time.perf_counter()
+                report = ppiia.analyze(raw, use_ai_draft=use_ai_draft)
                 analysis = BillAnalysis.from_local(report.to_dict(), source)
                 analysis.metrics = ppiia_ai.compute_metrics(
                     engine="local",
-                    model="distilbart-cnn + distilbart-mnli",
-                    processing_seconds=None,
+                    model="source-based extraction" + (" + DistilBART draft" if use_ai_draft else ""),
+                    processing_seconds=time.perf_counter() - started,
                     input_words=source.word_count,
                     summary_text=analysis.plain_summary,
                 )
@@ -196,7 +201,10 @@ def timeline_chart(analysis: BillAnalysis):
 
 
 def render_dashboard(analysis: BillAnalysis) -> None:
+    local_mode = bool(analysis.metrics and analysis.metrics.engine == "local")
     st.subheader(analysis.title)
+    if local_mode:
+        st.info("The local summary uses selected source wording. Suggested sectors are keyword-based, not verified impacts. Selection and PDF extraction can miss or distort important details; check the full Bill.")
     caption_bits = []
     if analysis.ministry:
         caption_bits.append(f"**Ministry:** {analysis.ministry}")
@@ -211,18 +219,18 @@ def render_dashboard(analysis: BillAnalysis) -> None:
 
     m = analysis.metrics
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Category", analysis.category)
-    c2.metric("Sectors affected", len(analysis.sector_impacts) or "—")
+    c1.metric("Category", "Not assessed" if local_mode else analysis.category)
+    c2.metric("Possible sectors" if local_mode else "Sectors affected", len(analysis.detected_sectors) if local_mode else (len(analysis.sector_impacts) or "—"))
     c3.metric(
         "Reading grade level",
         m.readability_grade if m and m.readability_grade is not None else "—",
-        help="Flesch-Kincaid grade of the citizen summary — the project targets ≤ 8.",
+        help="Flesch-Kincaid reading grade is an estimate, not a measure of accuracy.",
     )
     c4.metric(
         "Processing time",
-        f"{m.processing_seconds:.0f} s" if m and m.processing_seconds else "—",
+        f"{m.processing_seconds:.2f} s" if m and m.processing_seconds is not None else "—",
     )
-    c5.metric("Controversy", analysis.controversy_level.capitalize())
+    c5.metric("Controversy", "Not assessed" if local_mode or not analysis.controversy_level else analysis.controversy_level.capitalize())
 
     tabs = st.tabs(
         [
@@ -239,8 +247,19 @@ def render_dashboard(analysis: BillAnalysis) -> None:
     with tabs[0]:
         if analysis.objective:
             st.markdown(f"**Objective:** {analysis.objective}")
-        st.markdown("#### What this bill means in plain language")
+        st.markdown("#### Source-based summary" if local_mode else "#### What this bill means in plain language")
         st.markdown(analysis.plain_summary or "*No summary generated.*")
+
+        if local_mode and analysis.ai_draft:
+            with st.expander("Optional AI draft: may contain errors"):
+                st.caption("This model-generated draft is not checked for factual accuracy. Compare it with the full Bill.")
+                st.write(analysis.ai_draft)
+
+        if local_mode and analysis.key_provisions:
+            st.markdown("#### Selected passages extracted from the Bill")
+            st.caption("These passages are selected automatically and may contain extraction errors or omit important provisions. Read the complete Bill.")
+            for passage in analysis.key_provisions:
+                st.markdown(f"- {passage.description}")
 
         if analysis.persona_impacts:
             st.markdown("#### What changes for you")
@@ -256,19 +275,28 @@ def render_dashboard(analysis: BillAnalysis) -> None:
                 with st.expander(faq.question):
                     st.write(faq.answer)
 
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown("#### ✅ Positives")
-            for p in analysis.positives or ["—"]:
-                st.markdown(f"- {p}")
-        with col_b:
-            st.markdown("#### ⚠️ Negatives")
-            for n in analysis.negatives or ["—"]:
-                st.markdown(f"- {n}")
+        if not local_mode:
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown("#### ✅ Positives")
+                for p in analysis.positives or ["—"]:
+                    st.markdown(f"- {p}")
+            with col_b:
+                st.markdown("#### ⚠️ Negatives")
+                for n in analysis.negatives or ["—"]:
+                    st.markdown(f"- {n}")
 
     # --- Sector impact ---------------------------------------------------
     with tabs[1]:
-        if analysis.sector_impacts:
+        if local_mode:
+            st.caption("Possible topics matched to words in the Bill. The excerpts show why each topic was suggested; they do not establish an impact. Some topics may be missed or incidental.")
+            if analysis.topic_evidence:
+                for item in analysis.topic_evidence:
+                    st.markdown(f"**{item.sector}** — matched phrase: `{item.matched_phrase}`")
+                    st.write(item.excerpt)
+            else:
+                st.info("No sector has enough clear keyword evidence. Review the Bill directly.")
+        elif analysis.sector_impacts:
             st.plotly_chart(sector_impact_chart(analysis), width="stretch")
             for s in analysis.sector_impacts:
                 arrow = {"positive": "🟢", "negative": "🔴", "mixed": "🟠", "neutral": "⚪"}[s.direction]
@@ -317,35 +345,40 @@ def render_dashboard(analysis: BillAnalysis) -> None:
                 ]
             )
             st.dataframe(df, width="stretch", hide_index=True)
-            st.caption(
-                "Confidence *high* = cited in the bill text; *medium/low* = drawn from the "
-                "model's general knowledge — verify before quoting."
-            )
+            if local_mode:
+                st.caption("Possible references were found by text matching; verify each against the source.")
+            else:
+                st.caption("Confidence *high* = cited in the bill text; *medium/low* = drawn from the model's general knowledge — verify before quoting.")
         if not (analysis.policy_background or analysis.timeline or analysis.related_legislation):
             st.info("No chronology available for this document.")
 
     # --- Impact forecast --------------------------------------------------
     with tabs[3]:
-        horizons = [
-            ("first year after passage", "Short term", analysis.term_impacts.short_term),
-            ("1–5 years out", "Medium term", analysis.term_impacts.medium_term),
-            ("beyond 5 years", "Long term", analysis.term_impacts.long_term),
-        ]
-        cols = st.columns(3)
-        for col, (hint, label, horizon) in zip(cols, horizons):
-            with col, st.container(border=True):
-                st.markdown(f"**{label}**")
-                st.caption(hint)
-                for e in horizon.effects or ["—"]:
-                    st.markdown(f"- {e}")
-                if horizon.risks:
-                    st.markdown("*Risks:*")
-                    for r in horizon.risks:
-                        st.markdown(f"- ⚠️ {r}")
+        if local_mode:
+            st.info("Local mode does not predict future impacts. Review the Bill and consult an expert.")
+        else:
+            horizons = [
+                ("first year after passage", "Short term", analysis.term_impacts.short_term),
+                ("1–5 years out", "Medium term", analysis.term_impacts.medium_term),
+                ("beyond 5 years", "Long term", analysis.term_impacts.long_term),
+            ]
+            cols = st.columns(3)
+            for col, (hint, label, horizon) in zip(cols, horizons):
+                with col, st.container(border=True):
+                    st.markdown(f"**{label}**")
+                    st.caption(hint)
+                    for e in horizon.effects or ["—"]:
+                        st.markdown(f"- {e}")
+                    if horizon.risks:
+                        st.markdown("*Risks:*")
+                        for r in horizon.risks:
+                            st.markdown(f"- ⚠️ {r}")
 
     # --- Risks ------------------------------------------------------------
     with tabs[4]:
-        if analysis.risk_flags:
+        if local_mode:
+            st.info("Local mode does not assess risks or controversy. Review the Bill directly.")
+        elif analysis.risk_flags:
             st.markdown(
                 f"Overall controversy level: **{analysis.controversy_level.capitalize()}**"
             )
@@ -393,7 +426,7 @@ def render_dashboard(analysis: BillAnalysis) -> None:
                         {"Metric": "Summary words", "Value": m.summary_words},
                         {"Metric": "Compression ratio", "Value": m.compression_ratio},
                     ]
-                ),
+                ).astype({"Value": "string"}),
                 hide_index=True,
                 width="stretch",
             )
@@ -404,12 +437,11 @@ def render_dashboard(analysis: BillAnalysis) -> None:
 def render_landing() -> None:
     st.markdown(
         """
-##### Turn any government bill into a briefing every citizen can read.
+##### Explore a text-based English Bill with a source-based summary.
 
-1. Pick an input in the sidebar — upload a **PDF**, paste a **URL** from
-   [sansad.in](https://sansad.in/ls/knowledge-centre/government-bills), paste raw **text**,
-   or use the built-in **sample bill**.
-2. Choose an engine — **Claude AI** for the full analysis, or the free **local models**.
+1. Pick an input in the sidebar — upload a text-based **PDF**, paste a direct document **URL**,
+   paste **English text**, or use the built-in **sample bill**.
+2. Choose **local analysis** for selected source passages and possible topics without an API key.
 3. Click **Analyze bill**.
 
 No API key handy? Click **Load sample demo** in the sidebar to explore a precomputed
@@ -418,14 +450,14 @@ analysis instantly.
     )
     c1, c2, c3 = st.columns(3)
     with c1, st.container(border=True):
-        st.markdown("**📖 Plain-language summary**")
-        st.caption("10–20 lines at an 8th-grade reading level, plus FAQ and per-persona impacts.")
+        st.markdown("**📖 Source-based summary**")
+        st.caption("Selected source wording, which may miss details or contain extraction errors.")
     with c2, st.container(border=True):
-        st.markdown("**🏭 Sector impact & forecast**")
-        st.caption("Which industries win or lose, and what changes over 1, 5, and 10 years.")
+        st.markdown("**🏭 Possible sectors**")
+        st.caption("Keyword-matched topics with supporting excerpts, not impact assessments.")
     with c3, st.container(border=True):
-        st.markdown("**🕰️ History & risk flags**")
-        st.caption("Predecessor acts, policy timeline, and clauses likely to cause friction.")
+        st.markdown("**🕰️ References**")
+        st.caption("Possible law names are found by text matching and need verification.")
 
 
 # ---------------------------------------------------------------------------
@@ -438,12 +470,13 @@ with st.sidebar:
     st.markdown("### ⚙️ Engine")
     engine_name = st.radio(
         "Analysis engine",
-        ["Claude AI (recommended)", "Local models (offline, free)"],
-        help="Claude gives the full structured analysis. Local mode runs Hugging Face "
-        "models on your CPU with no API key, but produces a shallower report.",
+        ["Local analysis (no API key)", "Claude AI (recommended)"],
+        help="Local analysis selects source passages and keyword-matched topics. "
+        "Its optional AI draft uses a local model. Claude requires an API key.",
     )
 
     api_key: str | None = None
+    use_ai_draft = False
     model_id = ppiia_ai.DEFAULT_MODEL
     if engine_name.startswith("Claude"):
         model_label = st.selectbox("Claude model", list(MODEL_CHOICES))
@@ -460,7 +493,9 @@ with st.sidebar:
                 "(see .env.example).",
             ) or None
     else:
-        if not local_models_available():
+        st.caption("Local mode selects wording from English text-based Bills. Check the complete original document.")
+        use_ai_draft = st.checkbox("Generate an additional AI draft (slower; may be inaccurate)", value=False)
+        if use_ai_draft and not local_models_available():
             st.warning(
                 "Local models not installed — run "
                 "`pip install -r requirements-local.txt` first (~700 MB)."
@@ -501,7 +536,7 @@ if demo_clicked:
         st.error("Sample analysis file is missing (data/sample_analysis.json).")
 
 if analyze_clicked:
-    run_analysis(engine_name, input_mode, uploaded, url_value or "", pasted or "", api_key, model_id)
+    run_analysis(engine_name, input_mode, uploaded, url_value or "", pasted or "", api_key, model_id, use_ai_draft)
 
 analysis: BillAnalysis | None = st.session_state.get("analysis")
 if analysis is None:

@@ -373,7 +373,7 @@ def compute_metrics(
     return AnalysisMetrics(
         engine=engine,
         model=model,
-        processing_seconds=round(processing_seconds, 1) if processing_seconds else None,
+        processing_seconds=round(processing_seconds, 2) if processing_seconds is not None else None,
         flesch_reading_ease=ease,
         readability_grade=grade,
         input_words=input_words,

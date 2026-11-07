@@ -105,11 +105,15 @@ def build_pdf_report(analysis: BillAnalysis) -> bytes:
         body(analysis.objective)
 
     if analysis.plain_summary:
-        h2("Citizen-friendly summary")
+        h2("Source-based summary" if analysis.metrics and analysis.metrics.engine == "local" else "Citizen-friendly summary")
         body(analysis.plain_summary)
 
+    if analysis.ai_draft:
+        h2("Optional AI draft - may contain errors")
+        body(analysis.ai_draft)
+
     if analysis.key_provisions:
-        h2("Key provisions")
+        h2("Selected source passages" if analysis.metrics and analysis.metrics.engine == "local" else "Key provisions")
         for prov in analysis.key_provisions:
             ref = f" ({prov.clause_reference})" if prov.clause_reference else ""
             bullet(f"{prov.title}{ref}: {prov.description}")
@@ -118,6 +122,17 @@ def build_pdf_report(analysis: BillAnalysis) -> bytes:
         h2("Sector and industry impact")
         for s in analysis.sector_impacts:
             bullet(f"{s.sector} - {s.direction}, {s.magnitude} impact. {s.rationale}")
+
+    if analysis.topic_evidence:
+        h2("Possible relevant sectors")
+        body("Keyword-matched topics are not assessments of impact. Verify the excerpts against the full source.")
+        for item in analysis.topic_evidence:
+            bullet(f"{item.sector} (matched: {item.matched_phrase}): {item.excerpt}")
+    elif analysis.detected_sectors:
+        h2("Possible relevant sectors")
+        body("These are topic labels, not assessments of impact. Verify them against the source.")
+        for sector in analysis.detected_sectors:
+            bullet(sector)
 
     horizons = [
         ("Short term (0-1 year)", analysis.term_impacts.short_term),

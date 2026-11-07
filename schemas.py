@@ -95,6 +95,12 @@ class SectorImpact(BaseModel):
         return _norm_choice(v, ("low", "medium", "high"), "medium")
 
 
+class TopicEvidence(BaseModel):
+    sector: str
+    matched_phrase: str
+    excerpt: str
+
+
 class HorizonImpact(BaseModel):
     effects: list[str] = []
     risks: list[str] = []
@@ -163,11 +169,14 @@ class BillAnalysis(BaseModel):
     related_legislation: list[RelatedLegislation] = []
     timeline: list[TimelineEvent] = []
     sector_impacts: list[SectorImpact] = []
+    detected_sectors: list[str] = []
+    topic_evidence: list[TopicEvidence] = []
+    ai_draft: str = ""
     term_impacts: TermImpacts = TermImpacts()
     positives: list[str] = []
     negatives: list[str] = []
     risk_flags: list[RiskFlag] = []
-    controversy_level: Severity = "low"
+    controversy_level: Severity | None = "low"
     citizen_faq: list[CitizenFAQ] = []
     persona_impacts: list[PersonaImpact] = []
     source: SourceInfo | None = None
@@ -176,7 +185,9 @@ class BillAnalysis(BaseModel):
 
     @field_validator("controversy_level", mode="before")
     @classmethod
-    def _v_controversy(cls, v: object) -> str:
+    def _v_controversy(cls, v: object) -> str | None:
+        if v is None:
+            return None
         return _norm_choice(v, ("low", "medium", "high"), "low")
 
     @classmethod
@@ -196,20 +207,17 @@ class BillAnalysis(BaseModel):
         return cls(
             title=report.get("title") or "Bill analysis",
             ministry=report.get("ministry") or None,
-            category=sectors[0] if sectors else "Other",
+            category="Not assessed",
             objective=report.get("objective") or "",
             plain_summary=report.get("summary") or "",
-            sector_impacts=[
-                SectorImpact(
-                    sector=s,
-                    direction="neutral",
-                    magnitude="medium",
-                    rationale="Identified by the local zero-shot classifier.",
-                )
-                for s in sectors
-            ],
+            key_provisions=[KeyProvision(title="Source excerpt", description=passage)
+                            for passage in (report.get("source_passages") or [])],
+            detected_sectors=sectors,
+            topic_evidence=report.get("topic_evidence") or [],
+            ai_draft=report.get("ai_draft") or "",
+            controversy_level=None,
             related_legislation=[
-                RelatedLegislation(name=act, note="Mentioned in the bill text.", confidence="high")
+                RelatedLegislation(name=act, note="Possible mention found by a text pattern; verify in the source.", confidence="medium")
                 for act in (report.get("chronology") or [])[:15]
             ],
             term_impacts=TermImpacts(
